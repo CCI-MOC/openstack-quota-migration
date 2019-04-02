@@ -115,7 +115,7 @@ def apply(ctx, project, exclude, exclude_from, quotafile):
 
             LOG.info('setting %s quota for project %s', qtype, project['name'])
             set_func = getattr(conn, 'set_{}_quotas'.format(qtype))
-            #set_func(project['id'], **quota_values)
+            set_func(project['id'], **quota_values)
 
 
 @quotas.command()
@@ -144,7 +144,7 @@ def compare(ctx, output, reference, quotafile, projects):
         diff = jsondiff.diff(reference['quotas'], project['quotas'])
         if diff:
             LOG.warning('quota for project %s differs from reference',
-                     project['name'])
+                        project['name'])
             diffs.append({
                 'name': project['name'],
                 'id': project['id'],
