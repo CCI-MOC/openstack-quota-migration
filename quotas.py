@@ -35,18 +35,8 @@ def get_all_project_ids(conn):
     return [project.id for project in projects]
 
 
-@quotas.command()
-@click.option('-o', '--output', default=sys.stdout, type=click.File('w'))
-@click.argument('project', nargs=-1)
-@click.pass_context
-def get(ctx, output, project):
-    conn = ctx.obj
-
-    if not project:
-        project = get_all_project_ids(conn)
-
-    all_quotas = []
-    for p in project:
+def get_all_quotas(conn, projects):
+    for p in projects:
         p_data = conn.get_project(p)
         LOG.info('looking up quotas for project %s', p_data.name)
         quotas = {}
@@ -59,11 +49,24 @@ def get(ctx, output, project):
             if 'id' in quotas[qtype]:
                 del quotas[qtype]['id']
 
-        all_quotas.append({
+        yield({
             'id': p_data.id,
             'name': p_data.name,
             'quotas': quotas,
         })
+
+
+@quotas.command()
+@click.option('-o', '--output', default=sys.stdout, type=click.File('w'))
+@click.argument('projects', nargs=-1)
+@click.pass_context
+def get(ctx, output, projects):
+    conn = ctx.obj
+
+    if not projects:
+        projects = get_all_project_ids(conn)
+
+    all_quotas = list(get_all_quotas(conn, projects))
 
     LOG.info('writing quotas')
     json.dump(all_quotas, output, indent=2)
@@ -117,20 +120,30 @@ def apply(ctx, project, exclude, exclude_from, quotafile):
 
 @quotas.command()
 @click.option('-o', '--output', default=sys.stdout, type=click.File('w'))
-@click.argument('quotafile', default=sys.stdin, type=click.File('r'))
+@click.option('-q', '--quotafile', type=click.File('r'))
 @click.argument('reference', type=click.File('r'))
-def compare(output, quotafile, reference):
+@click.argument('projects', nargs=-1)
+@click.pass_context
+def compare(ctx, output, reference, quotafile, projects):
+    conn = ctx.obj
+
     if jsondiff is None:
         raise click.ClickException('compare requires the jsondiff module')
 
-    quotas = json.load(quotafile)
+    if quotafile is None:
+        if not projects:
+            projects = get_all_project_ids(conn)
+        quotas = get_all_quotas(conn, projects)
+    else:
+        quotas = json.load(quotafile)
+
     reference = json.load(reference)
 
     diffs = []
     for project in quotas:
         diff = jsondiff.diff(reference['quotas'], project['quotas'])
         if diff:
-            LOG.info('quota for project %s differs from reference',
+            LOG.warning('quota for project %s differs from reference',
                      project['name'])
             diffs.append({
                 'name': project['name'],
@@ -139,6 +152,7 @@ def compare(output, quotafile, reference):
             })
 
     json.dump(diffs, output, indent=2)
+
 
 if __name__ == '__main__':
     quotas()
