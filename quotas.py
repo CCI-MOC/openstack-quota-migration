@@ -115,7 +115,11 @@ def apply(ctx, project, exclude, exclude_from, quotafile):
 
             LOG.info('setting %s quota for project %s', qtype, project['name'])
             set_func = getattr(conn, 'set_{}_quotas'.format(qtype))
-            set_func(project['id'], **quota_values)
+            try:
+                set_func(project['id'], **quota_values)
+            except openstack.exceptions.SDKException as err:
+                LOG.error('failed to set quota for project %s: %s',
+                          project['name'], err)
 
 
 @quotas.command()
