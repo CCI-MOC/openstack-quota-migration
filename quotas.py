@@ -145,7 +145,8 @@ def compare(ctx, output, reference, quotafile, projects):
 
     diffs = []
     for project in quotas:
-        diff = jsondiff.diff(reference['quotas'], project['quotas'])
+        diff = jsondiff.diff(reference['quotas'], project['quotas'],
+                             marshal=True)
         if diff:
             LOG.warning('quota for project %s differs from reference',
                         project['name'])
